@@ -1,0 +1,17 @@
+--find-links https://download.pytorch.org/whl/torch_stable.html
+
+torch==1.10.0+cu113
+numpy~=1.21.4
+unidecode~=1.1.2
+inflect~=5.0.2
+librosa~=0.8.0
+scipy~=1.4.1
+omegaconf~=2.1.1
+scikit-learn~=0.24.0
+webrtcvad~=2.0.10
+phonemizer~=2.2.2
+g2p-en==2.1.0
+tgt~=1.4.4
+pyworld~=0.3.0
+matplotlib~=3.3.3
+pydub~=0.25.1
