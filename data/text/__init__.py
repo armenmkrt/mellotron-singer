@@ -6,7 +6,6 @@ from phonemizer.phonemize import phonemize
 
 from data.text import cleaners
 from data.text.symbols import g2p_phonemes
-from data.text.symbols import ipa_phonemes
 
 # G2p phonemizer for inference
 g2p = G2p()
@@ -27,14 +26,15 @@ def get_symbol_id_dicts(ipa_chars, g2p_chars, is_g2p=True):
 
 
 def phoneme_duration_to_sequence(duration_phoneme, is_g2p=True):
-    duration_data = []
     phoneme_data = []
-    _symbol_to_id, _ = get_symbol_id_dicts(ipa_phonemes, g2p_phonemes, is_g2p)
-    for item in duration_phoneme:
-        duration_data.append(float(item.split(" ")[0]))
-        phoneme_data.append(_symbol_to_id[item.split(" ")[1]])
+    _symbol_to_id, _ = get_symbol_id_dicts(ipa_chars=None, g2p_chars=g2p_phonemes, is_g2p=is_g2p)
+    for item in duration_phoneme.split():
+        phoneme_data.append(_symbol_to_id[item])
 
-    return phoneme_data, duration_data
+    phoneme_data.insert(0, _symbol_to_id['>'])
+    phoneme_data.append(_symbol_to_id['<'])
+
+    return phoneme_data
 
 
 def text_to_phonemized_sequence(text: str, cleaner_names, is_g2p=True):
@@ -47,7 +47,7 @@ def text_to_phonemized_sequence(text: str, cleaner_names, is_g2p=True):
 
     :return: list of converted token IDs
     """
-    _symbol_to_id, _ = get_symbol_id_dicts(ipa_phonemes, g2p_phonemes, is_g2p)
+    _symbol_to_id, _ = get_symbol_id_dicts(ipa_chars=None, g2p_chars=g2p_phonemes, is_g2p=is_g2p)
     print(_symbol_to_id)
     if is_g2p:
         sequence, phonemized_symbols = _g2p_phonemized_symbol_to_sequence(text, _symbol_to_id)
@@ -79,7 +79,7 @@ def text_to_sequence(text, cleaner_names):
         List of integers corresponding to the symbols in the text
     """
     sequence = []
-    _symbol_to_id, _ = get_symbol_id_dicts(g2p_phonemes, g2p_chars=ipa_phonemes, is_g2p=True)
+    _symbol_to_id, _ = get_symbol_id_dicts(ipa_chars=None, g2p_chars=g2p_phonemes, is_g2p=True)
     # Check for curly braces and treat their contents as ARPAbet:
     while len(text):
         m = _curly_re.match(text)

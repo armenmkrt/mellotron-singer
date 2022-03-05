@@ -12,7 +12,6 @@ from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from data import audio as Audio
-from utils.yin import compute_yin
 
 
 class Preprocessor:
@@ -330,6 +329,7 @@ class Preprocessor:
         # Trim tailing silences
         phones = phones[:end_idx]
         durations = durations[:end_idx]
+        durations_sec = durations_sec[:end_idx]
 
         return phones, durations, durations_sec, start_time, end_time
 

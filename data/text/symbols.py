@@ -35,20 +35,3 @@ _arpabet_phonemes = ['AA0', 'AA1', 'AA2', 'AE0', 'AE1', 'AE2', 'AH0', 'AH1', 'AH
 
 # Export all symbols:
 g2p_phonemes = [_pad_token, _eos, _sos] + _arpabet_phonemes
-
-_vowels = 'iyɨʉɯuɪʏʊeøɘəɵɤoɛœɜɞʌɔæɐaɶɑɒᵻ'
-_non_pulmonic_consonants = 'ʘɓǀɗǃʄǂɠǁʛ'
-_pulmonic_consonants = 'pbtdʈɖcɟkɡqɢʔɴŋɲɳnɱmʙrʀⱱɾɽɸβfvθðszʃʒʂʐçʝxɣχʁħʕhɦɬɮʋɹɻjɰlɭʎʟ'
-_suprasegmentals = 'ˈˌːˑ'
-_other_symbols = 'ʍwɥʜʢʡɕʑɺɧ'
-_diacrilics = 'ɚ˞ɫ'
-_ipa_phonemes = sorted(list(
-    _vowels + _non_pulmonic_consonants + _pulmonic_consonants + _suprasegmentals + _other_symbols + _diacrilics))
-_punctuations = '!,-.:;? \'()'
-_space = '_'
-_alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzäüößÄÖÜ'
-
-ipa_phonemes = [_pad_token, _eos, _sos, _space] + sorted(list(_ipa_phonemes) + list(_punctuations))
-
-
-
