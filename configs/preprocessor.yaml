@@ -2,13 +2,13 @@ dataset: "libritts_clean"
 experiment_name: "libritts_clean"
 
 path:
-  dataset_path: "/home/podcastle/Documents/mari"
-  output_path: "/home/podcastle/Documents/mari_preprocessed"
+  dataset_path: "/home/podcastle/workspace/TransformerTTS_clean/LibriTTS_clean_wavs/"
+  output_path: "/home/podcastle/Documents/LibriTTS_processed/"
   mfa_folder: "${path.output_path}/mfa_folder"
 
 
 preprocessing:
-  val_ratio: 0.01
+  val_ratio: 0.001
   text:
     ipa: True
     text_cleaners: ["english_cleaners"]

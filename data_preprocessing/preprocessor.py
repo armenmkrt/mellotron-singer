@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 
+import torch
 import librosa
 import numpy as np
 import pyworld as pw
