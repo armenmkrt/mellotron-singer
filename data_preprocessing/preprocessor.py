@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 from data import audio as Audio
+from data.audio.yin import compute_yin
 
 
 class Preprocessor:

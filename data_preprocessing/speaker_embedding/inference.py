@@ -159,7 +159,8 @@ if __name__ == '__main__':
                         default='/home/podcastle/Documents/mari_preprocessed/mfa_folder')
     parser.add_argument("--multi_speaker", default=False, action="store_true")
     parser.add_argument("--output_path", type=str, help="path for output npy file")
-    parser.add_argument("--model_path", type=str, default="models/speaker_embedding/pretrained.pt")
+    parser.add_argument("--model_path", type=str,
+                        default="/home/podcastle/workspace/vc-training-pipeline/models/speaker_embedding/pretrained.pt")
 
     args = parser.parse_args()
     load_model(weights_fpath=args.model_path)
