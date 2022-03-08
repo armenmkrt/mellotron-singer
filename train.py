@@ -208,14 +208,14 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--hparams', type=str,
-                        default="configs/synthesizer_train.yaml",
+                        default="/home/podcastle/Documents/mellotron-singer/configs/train.yaml",
                         help="hyperparameters config file path")
     parser.add_argument('-o', '--output_directory', type=str,
-                        default="models/synthesizers/fine_tuning_YV/",
+                        default="/home/podcastle/Documents/mellotron-singer/models/base_model/",
                         help='directory to save checkpoints')
     parser.add_argument('-l', '--log_directory', type=str, default="./runs/",
                         help='directory to save tensorboard logs')
-    parser.add_argument('-c', '--checkpoint_path', type=str, default='/home/aiteam/Documents/checkpoint_151000',
+    parser.add_argument('-c', '--checkpoint_path', type=str,
                         required=False, help='checkpoint path')
     parser.add_argument('--warm_start', action='store_true',
                         help='load model weights only, ignore specified layers')

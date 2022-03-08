@@ -272,12 +272,18 @@ class Decoder(nn.Module):
         self.prenet_dim = hparams.prenet_dim
         self.p_decoder_dropout = hparams.p_decoder_dropout
 
+        self.prenet_f0 = ConvNorm(
+            1, hparams.prenet_f0_dim,
+            kernel_size=hparams.prenet_f0_kernel_size,
+            padding=max(0, int(hparams.prenet_f0_kernel_size/2)),
+            bias=False, stride=1, dilation=1)
+
         self.prenet = Prenet(
             hparams.n_mel_channels * hparams.n_frames_per_step,
             [hparams.prenet_dim, hparams.prenet_dim])
 
         self.first_rnn = nn.LSTMCell(
-            hparams.prenet_dim + hparams.encoder_embedding_dim + hparams.speaker_embedding_dim + hparams.positional_encoding_d,
+            hparams.prenet_dim + hparams.encoder_embedding_dim + hparams.speaker_embedding_dim + hparams.positional_encoding_d + 1,
             hparams.attention_rnn_dim)
 
         self.gaussian_upsampling = GaussianUpsampling()
@@ -295,6 +301,12 @@ class Decoder(nn.Module):
         self.gate_layer = LinearNorm(
             hparams.decoder_rnn_dim + hparams.encoder_embedding_dim + hparams.speaker_embedding_dim, 1,
             bias=True, w_init_gain='sigmoid')
+
+    def get_end_f0(self, f0s):
+        B = f0s.size(0)
+        dummy = Variable(f0s.data.new(B, 1, f0s.size(1)).zero_())
+        return dummy
+
 
     def get_go_frame(self, memory):
         """ Gets all zeros frames to use as first decoder input
@@ -428,7 +440,7 @@ class Decoder(nn.Module):
         return decoder_output, self.alignment_weights
 
     def forward(self, memory, durations_in_frames, duration_frames_indices,
-                range_pred, decoder_inputs,  memory_lengths):
+                range_pred, decoder_inputs, f0s, memory_lengths):
         """
         Decoder forward pass for training
         PARAMS
@@ -451,10 +463,17 @@ class Decoder(nn.Module):
         self.initialize_decoder_states(
             memory, mask=~get_mask_from_lengths_nat(memory_lengths))
 
+        # audio features
+        f0_dummy = self.get_end_f0(f0s)
+        f0s = torch.cat((f0s, f0_dummy), dim=2)
+        f0s = F.relu(self.prenet_f0(f0s))
+        f0s = f0s.permute(2, 0, 1)
+
         mel_outputs, alignments = [], []
         decoder_step = 0
         while len(mel_outputs) < decoder_inputs.size(0) - 1:
-            decoder_input = decoder_inputs[len(mel_outputs)]
+            decoder_input = torch.cat((decoder_inputs[len(mel_outputs)],
+                                       f0s[len(mel_outputs)]), dim=1)
             mel_output, alignment_weights = self.decode(decoder_step, memory,
                                                         decoder_input, durations_in_frames,
                                                         duration_frames_indices, range_pred)
@@ -546,7 +565,7 @@ class NAT(nn.Module):
         """
 
         phonemes_padded, durations_padded, unpacked_durations_padded, durations_in_frames, input_lengths, mel_padded, \
-            output_lengths, embeds = batch
+            output_lengths, embeds, f0s_padded = batch
         phonemes_padded = to_gpu(phonemes_padded).long()
         durations_padded = to_gpu(durations_padded).float()
         unpacked_durations_padded = to_gpu(unpacked_durations_padded).long()
@@ -555,11 +574,12 @@ class NAT(nn.Module):
         max_len = torch.max(input_lengths.data).item()
         input_lengths = to_gpu(input_lengths).long()
         mel_padded = to_gpu(mel_padded).float()
+        f0s_padded = to_gpu(f0s_padded).float()
         output_lengths = to_gpu(output_lengths).long()
         embeds = to_gpu(embeds).float()
 
         return ((phonemes_padded, unpacked_durations_padded, durations_in_frames,
-                 input_lengths, mel_padded, max_len, output_lengths, embeds),
+                 input_lengths, mel_padded, max_len, output_lengths, embeds, f0s_padded),
                 (mel_padded, durations_padded))
 
     def parse_output(self, outputs, mel_output_lengths=None, dur_outputs_lengths=None) -> list:
@@ -592,7 +612,7 @@ class NAT(nn.Module):
         :return: model outputs masked by parse_output method
         """
         text_inputs, duration_frames_indices, durations_in_frames, \
-        text_lengths, mels, max_len, output_lengths, embeds = inputs
+        text_lengths, mels, max_len, output_lengths, embeds, f0s = inputs
 
         text_lengths, output_lengths = text_lengths.data, output_lengths.data
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
@@ -616,7 +636,7 @@ class NAT(nn.Module):
         # Calling decoder to get mel spectrogram
         mel_outputs, alignments = self.decoder(
             encoder_outputs, durations_in_frames, duration_frames_indices,
-            range_pred, mels, memory_lengths=text_lengths)
+            range_pred, mels, f0s, memory_lengths=text_lengths)
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet

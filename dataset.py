@@ -25,6 +25,7 @@ class TextMelDurLoader(torch.utils.data.Dataset):
         self.duration_folder_path = os.path.join(self.dataset_path, "duration")
         self.duration_in_sec_folder_path = os.path.join(self.dataset_path, "duration_in_sec")
         self.mel_folder_path = os.path.join(self.dataset_path, "mel")
+        self.f0_folder_path = os.path.join(self.dataset_path, "f0s")
 
         self.audiopaths_and_text = helpers.load_file_paths_dur_and_phonemes(audiopaths_and_text)
 
@@ -39,7 +40,9 @@ class TextMelDurLoader(torch.utils.data.Dataset):
                                             dtype=np.float32)
 
         for speaker, index in self.speaker_mapping.items():
-            pretrained_embeddings_np[index] = self.get_embedding(embed_path=os.path.join(self.dataset_path, f'{speaker}.npy'))
+            pretrained_embeddings_np[index] = self.get_embedding(embed_path=os.path.join(self.dataset_path,
+                                                                                         'averaged_embeddings',
+                                                                                         f'{speaker}.npy'))
 
         self.pretrained_embeddings = torch.from_numpy(pretrained_embeddings_np)
         self.durations_length_mean, self.durations_length_std = self.get_duration_stats()
@@ -59,13 +62,15 @@ class TextMelDurLoader(torch.utils.data.Dataset):
         # Separate filenames and texts, embeddings, durations
         audio_name, phonemes = audiopath_and_text[0], audiopath_and_text[1]
 
-        speaker_id = re.findall(f'[a-zA-Z]+', audio_name)[0]
+        speaker_id = audio_name.split("_")[0]
         mel_path = os.path.join(self.mel_folder_path, audio_name + ".npy")
+        f0_path = os.path.join(self.f0_folder_path, audio_name + '.npy')
         duration_path = os.path.join(self.duration_folder_path, audio_name + ".npy")
         duration_in_sec_path = os.path.join(self.duration_in_sec_folder_path, audio_name + ".npy")
 
         # Calculating mel-spectrogram and loading embedding
         mel = self.get_mel(mel_path)
+        f0 = self.get_f0(f0_path)
         duration_in_frames = self.load_durations_from_numpy(duration_path, in_seconds=False)
         duration_in_sec = self.load_durations_from_numpy(duration_in_sec_path, in_seconds=True)
         embedding = self.pretrained_embeddings[self.speaker_mapping[speaker_id]]
@@ -79,7 +84,7 @@ class TextMelDurLoader(torch.utils.data.Dataset):
         # Normalizing durations in seconds
         duration_in_sec = (duration_in_sec - self.durations_length_mean) / self.durations_length_std
 
-        return phoneme_ids, duration_in_sec, unpacked_durations, duration_in_frames, mel, embedding
+        return phoneme_ids, duration_in_sec, unpacked_durations, duration_in_frames, mel, embedding, f0
 
     def get_mel(self, filename):
         # Calculating mel-spectrogram
@@ -94,6 +99,17 @@ class TextMelDurLoader(torch.utils.data.Dataset):
                 melspec.size(0), self.stft.n_mel_channels))
 
         return melspec
+
+    @staticmethod
+    def get_f0(filename):
+        f0 = np.load(filename)[0]
+
+        # Padding zeros in place of sos and sos tokens
+        f0 = np.insert(f0, 0, [0, 0])
+        f0 = np.append(f0, [0, 0])[None, :]
+
+        f0 = torch.from_numpy(f0)
+        return f0
 
     @staticmethod
     def load_durations_from_numpy(path, in_seconds=True):
@@ -151,7 +167,7 @@ class TextMelDurCollate:
         Collate's training batch from normalized text and mel-spectrogram
         PARAMS
         ------
-        batch: [phonemes, durations, durations_unpacked, durations_in_frames, mel, embed]
+        batch: [phonemes, durations, durations_unpacked, durations_in_frames, mel, embed, f0]
         """
         batch_size = len(batch)
         # Get longest unpacked duration for right zero padding
@@ -195,25 +211,29 @@ class TextMelDurCollate:
         # Right zero-pad mel-spec
         num_mels = batch[0][4].size(0)
         max_target_len = max([x[4].size(1) for x in batch])
-        if max_target_len % self.n_frames_per_step != 0:
-            max_target_len += self.n_frames_per_step - max_target_len % self.n_frames_per_step
-            assert max_target_len % self.n_frames_per_step == 0
 
-        # Include mel padded
         mel_padded = torch.FloatTensor(batch_size, num_mels, max_target_len)
         mel_padded.zero_()
+
+        f0_padded = torch.FloatTensor(batch_size, 1, max_target_len)
+        f0_padded.zero_()
+
         output_lengths = torch.LongTensor(batch_size)
 
         embeddings = torch.FloatTensor(batch_size, self.embed_size)
         for i in range(len(ids_of_sorted_phonemes)):
             mel = batch[ids_of_sorted_phonemes[i]][4]
+            f0 = batch[ids_of_sorted_phonemes[i]][6]
+
             mel_padded[i, :, :mel.size(1)] = mel
+            f0_padded[i, :, :f0.size(1)] = f0
+
             output_lengths[i] = mel.size(1)
 
             embeddings[i] = batch[ids_of_sorted_phonemes[i]][5]
 
         return [phonemes_padded, duration_padded, unpacked_durations_padded, durations_in_frames_padded,
-                input_lengths, mel_padded, output_lengths, embeddings]
+                input_lengths, mel_padded, output_lengths, embeddings, f0_padded]
 
 
 def batch_to_gpu(batch, device):

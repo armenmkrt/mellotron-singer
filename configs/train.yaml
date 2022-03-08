@@ -14,7 +14,7 @@ ignore_layers: ['embedding.weight']
 ################################
 # Data Parameters             #
 ################################
-dataset_path: "home/aiteam/Documents/yeva_preprocessed"
+dataset_path: "/home/podcastle/Documents/LibriTTS_processed"
 
 ################################
 # Audio Parameters             #
@@ -58,6 +58,10 @@ positional_encoding_max_len: 500
 n_frames_per_step: 1  # currently only 1 is supported
 decoder_rnn_dim: 1024
 prenet_dim: 256
+prenet_f0_n_layers: 1
+prenet_f0_dim: 1
+prenet_f0_kernel_size: 1
+
 max_decoder_steps: 1000
 gate_threshold: 0.5
 p_attention_dropout: 0.1
@@ -76,7 +80,7 @@ postnet_n_convolutions: 4
 # Optimization Hyperparameters #
 ################################
 use_saved_learning_rate: False
-learning_rate: 0.00003 # 3e-5
+learning_rate: 0.0003 # 3e-5
 weight_decay: 0.000001 # 1e-6
 grad_clip_thresh: 1.0
 batch_size: 32
