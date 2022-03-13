@@ -486,7 +486,7 @@ class Decoder(nn.Module):
 
         return mel_outputs, alignments
 
-    def inference(self, memory, durations_in_frames, unpacked_durations, range_pred):
+    def inference(self, memory, durations_in_frames, unpacked_durations, range_pred, f0s):
         """
         Decoder inference
         PARAMS
@@ -501,11 +501,16 @@ class Decoder(nn.Module):
         decoder_input = self.get_go_frame(memory)
 
         self.initialize_decoder_states(memory, mask=None)
+        # audio features
+        f0_dummy = self.get_end_f0(f0s)
+        f0s = torch.cat((f0s, f0_dummy), dim=2)
+        f0s = F.relu(self.prenet_f0(f0s))
+        f0s = f0s.permute(2, 0, 1)
 
         mel_outputs, alignments = [], []
         decoder_step = 0
         for _ in unpacked_durations[0]:
-            decoder_input = self.prenet(decoder_input)
+            decoder_input = torch.cat((self.prenet(decoder_input), f0s[len(mel_outputs)]), dim=1)
             mel_output, alignment = self.decode(decoder_step, memory,
                                                 decoder_input, durations_in_frames,
                                                 unpacked_durations, range_pred)

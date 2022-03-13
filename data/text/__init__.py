@@ -14,6 +14,15 @@ g2p = G2p()
 _curly_re = re.compile(r'(.*?)\{(.+?)\}(.*)')
 
 
+
+def get_arpabet(word, dictionary):
+    word_arpabet = dictionary.lookup(word)
+    if word_arpabet is not None:
+        return "{" + word_arpabet[0] + "}"
+    else:
+        return word
+
+
 # Mappings from symbol to numeric ID and vice versa:
 def get_symbol_id_dicts(ipa_chars, g2p_chars, is_g2p=True):
     if is_g2p:
@@ -84,9 +93,9 @@ def text_to_sequence(text, cleaner_names):
     while len(text):
         m = _curly_re.match(text)
         if not m:
-            sequence += _symbols_to_sequence(_clean_text(text, cleaner_names))
+            sequence += _symbols_to_sequence(_clean_text(text, cleaner_names), _symbol_to_id)
             break
-        sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
+        sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names), _symbol_to_id)
         sequence += _arpabet_to_sequence(m.group(2), _symbol_to_id)
         text = m.group(3)
 
