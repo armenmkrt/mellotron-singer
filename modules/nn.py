@@ -502,7 +502,9 @@ class Decoder(nn.Module):
 
         self.initialize_decoder_states(memory, mask=None)
         # audio features
+        print("f0s size", f0s.size())
         f0_dummy = self.get_end_f0(f0s)
+        print("f0_dummy size", f0_dummy.size())
         f0s = torch.cat((f0s, f0_dummy), dim=2)
         f0s = F.relu(self.prenet_f0(f0s))
         f0s = f0s.permute(2, 0, 1)
@@ -706,6 +708,44 @@ class NAT(nn.Module):
 
         outputs = self.parse_output(
             [mel_outputs, mel_outputs_postnet, predicted_durations, alignments])
+
+        return outputs
+
+    def semi_inference(self, text_encoded, durations_in_frames, f0s, embedding):
+        embedded_inputs = self.embedding(text_encoded).transpose(1, 2)
+        encoder_outputs = self.encoder.inference(embedded_inputs)
+
+        # Concatenating embeddings with encoder outputs
+        embeds = torch.unsqueeze(embedding, 1)
+        embeds = embeds.expand(-1, encoder_outputs.size(1), -1)
+        encoder_outputs = torch.cat([encoder_outputs, embeds], dim=-1)
+
+        unpacked_durations = []
+        for duration in durations_in_frames[0, :]:
+            unpacked_durations.append(torch.arange(duration) + 1)
+
+        unpacked_durations = torch.cat(unpacked_durations, dim=-1)
+        unpacked_durations = unpacked_durations.unsqueeze(0)
+
+        print("unpacked_durations size:", unpacked_durations.size())
+        print("durations_in_frames size:", durations_in_frames.size())
+
+        # Predicting range parameters
+        range_durations = durations_in_frames.unsqueeze(2) / 20
+        range_predictor_input = torch.cat((range_durations, encoder_outputs), -1)
+        range_pred = self.range_predictor.inference(range_predictor_input)
+
+        mel_outputs, alignments = self.decoder.inference(encoder_outputs,
+                                                         durations_in_frames,
+                                                         unpacked_durations,
+                                                         range_pred,
+                                                         f0s)
+
+        mel_outputs_postnet = self.postnet(mel_outputs)
+        mel_outputs_postnet = mel_outputs + mel_outputs_postnet
+
+        outputs = self.parse_output(
+            [mel_outputs, mel_outputs_postnet, None, alignments])
 
         return outputs
 

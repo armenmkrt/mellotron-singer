@@ -1,9 +1,9 @@
-dataset: "libritts_clean"
-experiment_name: "libritts_clean"
+dataset: "george"
+experiment_name: "george_michele"
 
 path:
-  dataset_path: "/home/podcastle/workspace/TransformerTTS_clean/LibriTTS_clean_wavs/"
-  output_path: "/home/podcastle/Documents/LibriTTS_processed/"
+  dataset_path: "/home/podcastle/Documents/GM/"
+  output_path: "/home/podcastle/Documents/GM_preprocessed/"
   mfa_folder: "${path.output_path}/mfa_folder"
 
 
