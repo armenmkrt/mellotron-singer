@@ -87,7 +87,7 @@ def process_line(line: str, wavs_folder: str, output_dir: str,
     base_name = parts[0]
     text = parts[-1]
     text = _clean_text(text, cleaners)
-    speaker = base_name.split('_', 1)[0]
+    speaker = base_name[:2]
 
     wav_path = os.path.join(wavs_folder, f"{base_name}.wav")
     speaker_folder = os.path.join(output_dir, speaker)

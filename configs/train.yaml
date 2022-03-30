@@ -14,7 +14,7 @@ ignore_layers: ['embedding.weight']
 ################################
 # Data Parameters             #
 ################################
-dataset_path: "/home/podcastle/Documents/LibriTTS_processed"
+dataset_path: "/home/podcastle/Documents/LJSpeech_preprocessed/"
 
 ################################
 # Audio Parameters             #
@@ -44,14 +44,13 @@ encoder_embedding_dim: 512
 duration_rnn_dim: 512
 duration_rnn_num_layers: 2
 
-
 # Range Predictor parameters
-range_model_input_size: 769 # 512 + 256 + 1
-range_rnn_dim: 1024
+range_model_input_size: 513 # 512 + 256 + 1
+range_rnn_dim: 512
 range_rnn_num_layers: 2
 
 # Positional Encoding Parameters
-positional_encoding_d: 256
+positional_encoding_d: 32
 positional_encoding_max_len: 500
 
 # Decoder parameters
@@ -63,7 +62,6 @@ prenet_f0_dim: 1
 prenet_f0_kernel_size: 1
 
 max_decoder_steps: 1000
-gate_threshold: 0.5
 p_attention_dropout: 0.1
 p_decoder_dropout: 0.1
 

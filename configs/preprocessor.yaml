@@ -2,15 +2,15 @@ dataset: "george"
 experiment_name: "george_michele"
 
 path:
-  dataset_path: "/home/podcastle/Documents/GM/"
-  output_path: "/home/podcastle/Documents/GM_preprocessed/"
+  dataset_path: "/home/podcastle/Documents/LJSpeech-1.1/"
+  output_path: "/home/podcastle/Documents/LJSpeech_preprocessed/"
   mfa_folder: "${path.output_path}/mfa_folder"
 
 
 preprocessing:
   val_ratio: 0.001
   text:
-    ipa: True
+    ipa: False
     text_cleaners: ["english_cleaners"]
     language: "en"
   audio:
@@ -26,7 +26,7 @@ preprocessing:
     mel_fmax: 8000 # set to 8000 for HiFi-GAN vocoder, set to null for MelGAN vocoder
   pitch:
     feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
-    normalization: True
+    normalization: False
   energy:
     feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
-    normalization: True
+    normalization: False

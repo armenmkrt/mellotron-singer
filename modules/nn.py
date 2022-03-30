@@ -137,7 +137,7 @@ class DurationPredictor(nn.Module):
     """
     def __init__(self, hparams):
         super(DurationPredictor, self).__init__()
-        self.input_size = hparams.encoder_embedding_dim + hparams.speaker_embedding_dim
+        self.input_size = hparams.encoder_embedding_dim
         self.duration_rnn_dim = hparams.duration_rnn_dim
         self.duration_rnn_num_layers = hparams.duration_rnn_num_layers
 
@@ -180,10 +180,6 @@ class RangePredictor(nn.Module):
         self.input_size = hparams.range_model_input_size
         self.range_rnn_dim = hparams.range_rnn_dim
         self.range_rnn_num_layers = hparams.range_rnn_num_layers
-
-        print(self.input_size,
-              self.range_rnn_dim,
-              self.range_rnn_num_layers)
 
         self.range_rnn = nn.LSTM(input_size=self.input_size,
                                  hidden_size=self.range_rnn_dim,
@@ -266,7 +262,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.n_mel_channels = hparams.n_mel_channels
         self.n_frames_per_step = hparams.n_frames_per_step
-        self.encoder_embedding_dim = hparams.encoder_embedding_dim + hparams.speaker_embedding_dim
+        self.encoder_embedding_dim = hparams.encoder_embedding_dim
         self.attention_rnn_dim = hparams.attention_rnn_dim
         self.decoder_rnn_dim = hparams.decoder_rnn_dim
         self.prenet_dim = hparams.prenet_dim
@@ -283,30 +279,26 @@ class Decoder(nn.Module):
             [hparams.prenet_dim, hparams.prenet_dim])
 
         self.first_rnn = nn.LSTMCell(
-            hparams.prenet_dim + hparams.encoder_embedding_dim + hparams.speaker_embedding_dim + hparams.positional_encoding_d + 1,
+            hparams.prenet_dim + hparams.encoder_embedding_dim + hparams.positional_encoding_d + 1,
             hparams.attention_rnn_dim)
 
         self.gaussian_upsampling = GaussianUpsampling()
-        self.positional_encoding = PositionalEncoding(hparams.positional_encoding_d,
-                                                      hparams.positional_encoding_max_len)
+        self.positional_encoding = PositionalEncoding(
+            hparams.positional_encoding_d,
+            hparams.positional_encoding_max_len)
 
         self.second_rnn = nn.LSTMCell(
             hparams.attention_rnn_dim,
             hparams.decoder_rnn_dim, True)
 
         self.linear_projection = LinearNorm(
-            2048,  # 2048
+            hparams.decoder_rnn_dim + hparams.encoder_embedding_dim + hparams.positional_encoding_d,
             hparams.n_mel_channels * hparams.n_frames_per_step)
-
-        self.gate_layer = LinearNorm(
-            hparams.decoder_rnn_dim + hparams.encoder_embedding_dim + hparams.speaker_embedding_dim, 1,
-            bias=True, w_init_gain='sigmoid')
 
     def get_end_f0(self, f0s):
         B = f0s.size(0)
         dummy = Variable(f0s.data.new(B, 1, f0s.size(1)).zero_())
         return dummy
-
 
     def get_go_frame(self, memory):
         """ Gets all zeros frames to use as first decoder input
@@ -572,7 +564,7 @@ class NAT(nn.Module):
         """
 
         phonemes_padded, durations_padded, unpacked_durations_padded, durations_in_frames, input_lengths, mel_padded, \
-            output_lengths, embeds, f0s_padded = batch
+            output_lengths, f0s_padded = batch
         phonemes_padded = to_gpu(phonemes_padded).long()
         durations_padded = to_gpu(durations_padded).float()
         unpacked_durations_padded = to_gpu(unpacked_durations_padded).long()
@@ -583,10 +575,9 @@ class NAT(nn.Module):
         mel_padded = to_gpu(mel_padded).float()
         f0s_padded = to_gpu(f0s_padded).float()
         output_lengths = to_gpu(output_lengths).long()
-        embeds = to_gpu(embeds).float()
 
         return ((phonemes_padded, unpacked_durations_padded, durations_in_frames,
-                 input_lengths, mel_padded, max_len, output_lengths, embeds, f0s_padded),
+                 input_lengths, mel_padded, max_len, output_lengths, f0s_padded),
                 (mel_padded, durations_padded))
 
     def parse_output(self, outputs, mel_output_lengths=None, dur_outputs_lengths=None) -> list:
@@ -619,16 +610,11 @@ class NAT(nn.Module):
         :return: model outputs masked by parse_output method
         """
         text_inputs, duration_frames_indices, durations_in_frames, \
-        text_lengths, mels, max_len, output_lengths, embeds, f0s = inputs
+        text_lengths, mels, max_len, output_lengths, f0s = inputs
 
         text_lengths, output_lengths = text_lengths.data, output_lengths.data
         embedded_inputs = self.embedding(text_inputs).transpose(1, 2)
         encoder_outputs = self.encoder(embedded_inputs, text_lengths)
-        embeds = torch.unsqueeze(embeds, 1)
-        embeds = embeds.expand(-1, encoder_outputs.size(1), -1)
-
-        # Concatenating encoder_outputs with speaker embeddings
-        encoder_outputs = torch.cat([encoder_outputs, embeds], dim=-1)
 
         # Predicting phoneme durations
         durations_pred = self.duration_predictor(encoder_outputs, text_lengths)
