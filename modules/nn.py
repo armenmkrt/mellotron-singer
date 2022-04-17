@@ -240,6 +240,14 @@ class GaussianUpsampling(nn.Module):
         weighted_encoder_outputs = weighted_encoder_outputs.squeeze(-1)
         return weighted_encoder_outputs, weights
 
+    def inference(self, encoder_outputs, alignment):
+        alignment = alignment.unsqueeze(0)
+        alignment = alignment.unsqueeze(-1)
+        encoder_outputs = encoder_outputs.transpose(1, 2)
+        weighted_encoder_outputs = torch.bmm(encoder_outputs, alignment)
+        weighted_encoder_outputs = weighted_encoder_outputs.squeeze(-1)
+        return weighted_encoder_outputs, alignment
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5):
@@ -391,7 +399,9 @@ class Decoder(nn.Module):
 
         return mel_outputs, alignments
 
-    def decode(self, decoder_step, encoder_outputs, decoder_input, durations_in_frames, duration_frames_indices, range_pred):
+    def decode(self, decoder_step, encoder_outputs, decoder_input,
+               durations_in_frames, duration_frames_indices, range_pred,
+               alignments, training=True):
         """
         Decoder step using stored states, attention and memory
         PARAMS
@@ -403,10 +413,15 @@ class Decoder(nn.Module):
         gate_output: gate output energies
         attention_weights:
         """
-        sampled_encoder_outputs, self.alignment_weights = self.gaussian_upsampling(encoder_outputs,
-                                                                                   durations_in_frames,
-                                                                                   range_pred,
-                                                                                   decoder_step)
+        if training:
+            sampled_encoder_outputs, self.alignment_weights = self.gaussian_upsampling(encoder_outputs,
+                                                                                       durations_in_frames,
+                                                                                       range_pred,
+                                                                                       decoder_step)
+        else:
+            sampled_encoder_outputs, self.alignment_weights = self.gaussian_upsampling.inference(encoder_outputs,
+                                                                                                 alignments)
+
         positions = duration_frames_indices[:, decoder_step]
         sampled_encoder_outputs = self.positional_encoding(sampled_encoder_outputs, positions)
 
@@ -472,13 +487,14 @@ class Decoder(nn.Module):
             mel_outputs += [mel_output.squeeze(1)]
             alignments += [alignment_weights]
             decoder_step += 1
-        mel_outputs, alignments = self.parse_decoder_outputs(
-            mel_outputs, alignments)
+
+        mel_outputs, alignments = self.parse_decoder_outputs(mel_outputs, alignments)
         alignments = alignments.squeeze(-1)
 
         return mel_outputs, alignments
 
-    def inference(self, memory, durations_in_frames, unpacked_durations, range_pred, f0s):
+    def inference(self, memory, durations_in_frames, unpacked_durations,
+                  range_pred, f0s, hard_alignments):
         """
         Decoder inference
         PARAMS
@@ -503,11 +519,12 @@ class Decoder(nn.Module):
 
         mel_outputs, alignments = [], []
         decoder_step = 0
-        for _ in unpacked_durations[0]:
+        T = unpacked_durations[0].size(0) - 1
+        for i in range(T):
             decoder_input = torch.cat((self.prenet(decoder_input), f0s[len(mel_outputs)]), dim=1)
             mel_output, alignment = self.decode(decoder_step, memory,
                                                 decoder_input, durations_in_frames,
-                                                unpacked_durations, range_pred)
+                                                unpacked_durations, range_pred, hard_alignments[:, i], training=False)
 
             mel_outputs += [mel_output.squeeze(1)]
             alignments += [alignment]
@@ -697,14 +714,9 @@ class NAT(nn.Module):
 
         return outputs
 
-    def semi_inference(self, text_encoded, durations_in_frames, f0s, embedding):
+    def semi_inference(self, text_encoded, durations_in_frames, f0s, hard_alignment):
         embedded_inputs = self.embedding(text_encoded).transpose(1, 2)
         encoder_outputs = self.encoder.inference(embedded_inputs)
-
-        # Concatenating embeddings with encoder outputs
-        embeds = torch.unsqueeze(embedding, 1)
-        embeds = embeds.expand(-1, encoder_outputs.size(1), -1)
-        encoder_outputs = torch.cat([encoder_outputs, embeds], dim=-1)
 
         unpacked_durations = []
         for duration in durations_in_frames[0, :]:
@@ -712,9 +724,6 @@ class NAT(nn.Module):
 
         unpacked_durations = torch.cat(unpacked_durations, dim=-1)
         unpacked_durations = unpacked_durations.unsqueeze(0)
-
-        print("unpacked_durations size:", unpacked_durations.size())
-        print("durations_in_frames size:", durations_in_frames.size())
 
         # Predicting range parameters
         range_durations = durations_in_frames.unsqueeze(2) / 20
@@ -725,7 +734,8 @@ class NAT(nn.Module):
                                                          durations_in_frames,
                                                          unpacked_durations,
                                                          range_pred,
-                                                         f0s)
+                                                         f0s,
+                                                         hard_alignment)
 
         mel_outputs_postnet = self.postnet(mel_outputs)
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
