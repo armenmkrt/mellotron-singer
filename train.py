@@ -10,7 +10,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 import utils.helper_funcs as helpers
 from dataset import TextMelDurCollate
-from dataset import TextMelDurLoader
+from dataset import TextMelDurLoader, BySequenceLengthSampler
 from loss import NATLoss
 from modules.nn import NAT
 from utils.distributed import apply_gradient_allreduce
@@ -30,17 +30,16 @@ def prepare_dataloaders(hparams_):
                                    trainset.durations_length_mean,
                                    trainset.durations_length_std)
 
-    if hparams_.distributed_run:
-        train_sampler = DistributedSampler(trainset)
-        shuffle = False
-    else:
-        train_sampler = None
-        shuffle = True
+    bucket_boundaries = [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200]
+    batch_size = hparams_.batch_size
 
-    train_loader = DataLoader(trainset, num_workers=10, shuffle=shuffle,
-                              sampler=train_sampler,
-                              batch_size=hparams_.batch_size, pin_memory=False,
-                              drop_last=True, collate_fn=collate_fn)
+    train_sampler = BySequenceLengthSampler(trainset, bucket_boundaries, batch_size)
+
+    train_loader = DataLoader(trainset,
+                              num_workers=4,
+                              batch_sampler=train_sampler,
+                              pin_memory=False,
+                              collate_fn=collate_fn)
     return train_loader, valset, collate_fn
 
 
@@ -138,8 +137,12 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
     train_loader, valset, collate_fn = prepare_dataloaders(hparams_)
 
     # Load checkpoint if one exists
-    iteration = 0
+    iteration = 1
     epoch_offset = 0
+
+    warmup_step = 4000
+    d_model = 256
+
     if checkpoint_path is not None:
         if warm_start:
             model = helpers.warm_start_model(
@@ -160,7 +163,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
         for i, batch in enumerate(train_loader):
             start = time.perf_counter()
             for param_group in optimizer.param_groups:
-                param_group['lr'] = learning_rate
+                param_group['lr'] = (d_model ** (-0.5)) * min(iteration ** (-0.5), iteration * (warmup_step ** (-1.5)))
 
             model.zero_grad()
             x, y = model.parse_batch(batch)
@@ -192,7 +195,7 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
             if not is_overflow and (iteration % hparams_.iters_per_checkpoint == 0):
                 print("validation run")
                 validate(model, criterion, valset, iteration,
-                         1, n_gpus, collate_fn, logger,
+                         16, n_gpus, collate_fn, logger,
                          hparams_.distributed_run, rank)
                 if rank == 0:
                     checkpoint_path = os.path.join(

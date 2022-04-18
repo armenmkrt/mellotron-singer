@@ -483,7 +483,8 @@ class Decoder(nn.Module):
                                        f0s[len(mel_outputs)]), dim=1)
             mel_output, alignment_weights = self.decode(decoder_step, memory,
                                                         decoder_input, durations_in_frames,
-                                                        duration_frames_indices, range_pred)
+                                                        duration_frames_indices, range_pred,
+                                                        None, training=True)
             mel_outputs += [mel_output.squeeze(1)]
             alignments += [alignment_weights]
             decoder_step += 1
@@ -510,9 +511,7 @@ class Decoder(nn.Module):
 
         self.initialize_decoder_states(memory, mask=None)
         # audio features
-        print("f0s size", f0s.size())
         f0_dummy = self.get_end_f0(f0s)
-        print("f0_dummy size", f0_dummy.size())
         f0s = torch.cat((f0s, f0_dummy), dim=2)
         f0s = F.relu(self.prenet_f0(f0s))
         f0s = f0s.permute(2, 0, 1)

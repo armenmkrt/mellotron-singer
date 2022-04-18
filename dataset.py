@@ -6,6 +6,7 @@ import re
 import numpy as np
 import torch
 import torch.utils.data
+from tqdm import tqdm
 
 import utils.helper_funcs as helpers
 from data.audio.stft import TacotronSTFT
@@ -216,16 +217,50 @@ class TextMelDurCollate:
                 input_lengths, mel_padded, output_lengths, f0_padded]
 
 
-def batch_to_gpu(batch, device):
-    (text_padded, input_lengths, mel_padded, gate_padded,
-     output_lengths, len_x, audio) = batch
-    text_padded = helpers.to_gpu(text_padded).long() if device == 'cuda' else text_padded.long()
-    input_lengths = helpers.to_gpu(input_lengths).long() if device == 'cuda' else input_lengths.long()
-    max_len = torch.max(input_lengths.data).item() if device == 'cuda' else input_lengths.data.long()
-    mel_padded = helpers.to_gpu(mel_padded).float() if device == 'cuda' else mel_padded.float()
-    gate_padded = helpers.to_gpu(gate_padded).float() if device == 'cuda' else gate_padded.float()
-    output_lengths = helpers.to_gpu(output_lengths).long() if device == 'cuda' else output_lengths.long()
-    x = (text_padded, input_lengths, mel_padded, max_len, output_lengths)
-    y = (mel_padded, gate_padded)
-    len_x = torch.sum(output_lengths)
-    return x, y, len_x, audio
+class BySequenceLengthSampler(torch.utils.data.Sampler):
+    def __init__(self, data_source,
+                 bucket_boundaries, batch_size=64, ):
+        super(torch.utils.data.Sampler, self).__init__()
+        ind_n_len = []
+        for i, p in tqdm(enumerate(data_source)):
+            length = p[4].size(1)
+            ind_n_len.append((i, length))
+        self.ind_n_len = ind_n_len
+        self.bucket_boundaries = bucket_boundaries
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        data_buckets = dict()
+        # where p is the id number and seq_len is the length of this id number.
+        for p, seq_len in self.ind_n_len:
+            pid = self.element_to_bucket_id(p, seq_len)
+            if pid in data_buckets.keys():
+                data_buckets[pid].append(p)
+            else:
+                data_buckets[pid] = [p]
+
+        for k in data_buckets.keys():
+            data_buckets[k] = np.asarray(data_buckets[k])
+
+        iter_list = []
+        for k in data_buckets.keys():
+            np.random.shuffle(data_buckets[k])
+            iter_list += (np.array_split(data_buckets[k]
+                                         , int(data_buckets[k].shape[0] / self.batch_size)))
+        random.shuffle(iter_list)  # shuffle all the batches so they arent ordered by bucket
+        # size
+        for i in iter_list:
+            yield i.tolist()  # as it was stored in an array
+
+    def __len__(self):
+        return len(self.data_source)
+
+    def element_to_bucket_id(self, x, seq_length):
+        boundaries = list(self.bucket_boundaries)
+        buckets_min = [np.iinfo(np.int32).min] + boundaries
+        buckets_max = boundaries + [np.iinfo(np.int32).max]
+        conditions_c = np.logical_and(
+            np.less_equal(buckets_min, seq_length),
+            np.less(seq_length, buckets_max))
+        bucket_id = np.min(np.where(conditions_c))
+        return bucket_id
