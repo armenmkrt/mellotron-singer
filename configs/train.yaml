@@ -1,5 +1,5 @@
 epochs: 100000
-iters_per_checkpoint: 5000  # Change in fine tuning mode
+iters_per_checkpoint: 10000  # Change in fine tuning mode
 stop_iteration: 185000
 seed: 1234
 dynamic_loss_scaling: True
@@ -14,7 +14,7 @@ ignore_layers: ['embedding.weight']
 ################################
 # Data Parameters             #
 ################################
-dataset_path: "/home/podcastle/Documents/LJSpeech_preprocessed/"
+dataset_path: "/home/aiteam/Documents/LibriTTS-clean_preprocessed"
 
 ################################
 # Audio Parameters             #
@@ -45,7 +45,7 @@ duration_rnn_dim: 512
 duration_rnn_num_layers: 2
 
 # Range Predictor parameters
-range_model_input_size: 513 # 512 + 256 + 1
+range_model_input_size: 769 # 512 + 256 + 1
 range_rnn_dim: 512
 range_rnn_num_layers: 2
 

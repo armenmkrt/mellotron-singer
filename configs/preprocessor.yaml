@@ -2,8 +2,8 @@ dataset: "george"
 experiment_name: "george_michele"
 
 path:
-  dataset_path: "/home/podcastle/Documents/LJSpeech-1.1/"
-  output_path: "/home/podcastle/Documents/LJSpeech_preprocessed/"
+  dataset_path: "/home/aiteam/Documents//LibriTTS-clean"
+  output_path: "/home/aiteam/Documents/LibriTTS-clean_preprocessed/"
   mfa_folder: "${path.output_path}/mfa_folder"
 
 

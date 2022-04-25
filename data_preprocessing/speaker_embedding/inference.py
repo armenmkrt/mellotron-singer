@@ -160,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument("--multi_speaker", default=False, action="store_true")
     parser.add_argument("--output_path", type=str, help="path for output npy file")
     parser.add_argument("--model_path", type=str,
-                        default="/home/podcastle/workspace/vc-training-pipeline/models/speaker_embedding/pretrained.pt")
+                        default="models/embedding.pt")
 
     args = parser.parse_args()
     load_model(weights_fpath=args.model_path)

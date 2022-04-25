@@ -36,7 +36,7 @@ def prepare_dataloaders(hparams_):
     train_sampler = BySequenceLengthSampler(trainset, bucket_boundaries, batch_size)
 
     train_loader = DataLoader(trainset,
-                              num_workers=4,
+                              num_workers=8,
                               batch_sampler=train_sampler,
                               pin_memory=False,
                               collate_fn=collate_fn)
@@ -211,10 +211,10 @@ def train(output_directory, log_directory, checkpoint_path, warm_start, n_gpus,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--hparams', type=str,
-                        default="/home/podcastle/Documents/mellotron-singer/configs/train.yaml",
+                        default="configs/train.yaml",
                         help="hyperparameters config file path")
     parser.add_argument('-o', '--output_directory', type=str,
-                        default="/home/podcastle/Documents/mellotron-singer/models/base_model/",
+                        default="./models/base_model/",
                         help='directory to save checkpoints')
     parser.add_argument('-l', '--log_directory', type=str, default="./runs/",
                         help='directory to save tensorboard logs')
